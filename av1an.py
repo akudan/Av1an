@@ -6,6 +6,7 @@ from tqdm import tqdm
 import sys
 import os
 import shutil
+import shlex
 from distutils.spawn import find_executable
 from ast import literal_eval
 from psutil import virtual_memory
@@ -42,12 +43,21 @@ class Av1an:
             log.write(time.strftime('%X') + ' ' + info)
 
     def call_cmd(self, cmd, capture_output=False):
-        """Calling system shell, if capture_output=True output string will be returned."""
+        """Calling commands, if capture_output=True output string will be returned."""
+        cmds = [shlex.split(c) for c in cmd.split('|')]
+        stdout_ = lambda x: getattr(x, 'stdout', None)
+        ps = None
+
+        for cmd_ in cmds[:-1]:
+            ps = subprocess.Popen(cmd_, stdin=stdout_(ps), stdout=subprocess.PIPE)
+
+        cmd_ = cmds[-1]
+
         if capture_output:
-            return subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
+            return subprocess.check_output(cmd_, stdin=stdout_(ps), stderr=subprocess.STDOUT)
 
         with open(self.d.get('logging'), 'a') as log:
-            subprocess.run(cmd, shell=True, stdout=log, stderr=log)
+            subprocess.run(cmd_, stdin=stdout_(ps), stdout=log, stderr=log)
 
     def arg_parsing(self):
         """Command line parse and sanity checking."""
